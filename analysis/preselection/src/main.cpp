@@ -9,6 +9,7 @@
 #include "commonSelections.h"
 // ADD HERE ANALYZER
 #include "selections_Run2AllHad3FJ.h"
+#include "selections_Run2AllHad2FJ.h"
 
 #include "argparser.hpp"
 
@@ -38,6 +39,9 @@ RNode runAnalysis(RNode df, MyArgs args, bool isSignal) {
     if (args.ana == "Run2AllHad3FJ") {
         return Run2AllHad3FJ::runAnalysis(df);
     }
+    else if (args.ana == "Run2AllHad2FJ") {
+        return Run2AllHad2FJ::runAnalysis(df);
+    }
     else{
         std::cerr << "Did not recognize analysis namespace: " << args.ana  << std::endl;
         std::exit(EXIT_FAILURE);
@@ -62,17 +66,24 @@ RNode runMCAnalysis(RNode df, MyArgs args, bool isSignal) {
     auto df_out = defineCorrectedCols(df);
 
     // apply pre preselection corrections
+    // Apply JEC first if requested
+    // to test against run2 for which jec/jer were applied before preselection before the step of the 
+    // https://github.com/jkguiang/vbs/blob/3269f28e41e7b3e2113ac9756db5aa06db48d4fe/analysis/include/core/cuts.h#L247C1-L412C14 look at lines 321 and 329 then any good jets we apply the 20gev later
+    if (args.JEC){
+        if (args.VERB) { std::cout << " -> Running JEC corrections" << std::endl; }
+        df_out = JetEnergyCorrection(cset_jerc_2016preVFP, cset_jerc_2016postVFP, cset_jerc_2017, cset_jerc_2018, df_out, args.JEC_type, args.variation);
+    }
+    
+    // Then apply JER if requested (after JEC)(note both can be applied seprately for dubging)
     if (args.JER){
         if (args.VERB) { std::cout << " -> Running JER corrections" << std::endl; }
         df_out = JetEnergyResolution(cset_jerc_2016preVFP, cset_jerc_2016postVFP, cset_jerc_2017, cset_jerc_2018, cset_jer_smear, df_out, args.JERvariation);
     }
-    else if (args.METUnclustered) {
+    
+   
+    if (args.METUnclustered && !args.JEC && !args.JER) {
         if (args.VERB) { std::cout << " -> Running METUnclustered corrections" << std::endl; }
         df_out = METUnclusteredCorrections(df_out, args.variation);
-    }
-    else if (args.JEC){
-        if (args.VERB) { std::cout << " -> Running JEC corrections" << std::endl; }
-        df_out = JetEnergyCorrection(cset_jerc_2016preVFP, cset_jerc_2016postVFP, cset_jerc_2017, cset_jerc_2018, df_out, args.JEC_type, args.variation);
     }
 
     // run pre-selection
@@ -107,7 +118,7 @@ void create_directory_if_not_exists(const std::string &dir, MyArgs args) {
     }
     else {
         std::cerr << "Failed to create directory: " << dir << std::endl;
-        std::exit(EXIT_FAILURE); 
+        std::exit(EXIT_FAILURE);
     }
 }
 
@@ -126,7 +137,7 @@ int main(int argc, char** argv) {
 
     // define metadata
     auto df = defineMetadata(df_in);
-    
+
 
     // run analysis
     bool isData = false;
@@ -147,7 +158,7 @@ int main(int argc, char** argv) {
             output_file = "sig";
         }
         isSignal = true;
-    }           
+    }
     else {
         std::cerr << "Could not guess output name from spec name, file must contain sig, bkg or data" << std::endl;
         std::exit(EXIT_FAILURE);
@@ -163,13 +174,33 @@ int main(int argc, char** argv) {
             if (args.VERB) { std::cout << " -> Produce cutflow for predefined cuts" << std::endl; }
             std::vector<std::string> cutflow_cuts = {
                 "Pass_AtLeast3AK8Jets", "Pass_LeadAK8JetPtAbove550", "Pass_NoTightBak4Jet",
-                "Pass_3BosonCandidatesExist", "Pass_NoAK8JetsOverlap", "Pass_TwoVBSJets", "Pass_LooseSR", "Pass_TightSR", 
+                "Pass_3BosonCandidatesExist", "Pass_NoAK8JetsOverlap", "Pass_TwoVBSJets", "Pass_LooseSR", "Pass_TightSR",
                 "Pass_RegionAcut", "Pass_RegionBcut", "Pass_RegionCcut", "Pass_RegionDcut",
-                "passCut1", "passCut2", "passCut3", "passCut4", "passCut5", "passCut6", "passCut7", 
+                "passCut1", "passCut2", "passCut3", "passCut4", "passCut5", "passCut6", "passCut7",
                 "passCut8", "passCut9", "passCut10", "RegionA", "RegionB", "RegionC", "RegionD"};
             auto cutflow = Cutflow(df_final, cutflow_cuts);
             cutflow.Print(output_dir + "/" + output_file + "_cutflow.txt");
          }
+        else if (args.ana == "Run2AllHad2FJ") {
+            if (args.VERB) { std::cout << " -> Produce cutflow for predefined cuts" << std::endl; }
+           std::vector<std::string> cutflow_cuts_2FJ = {
+               "passCut1_Semi_EventFilters",
+               "passCut2_Semi_InitialJetCut",
+               "passCut3_Semi_Triggers",
+               "passCut4_Semi_TriggerPlateau",
+               "passCut5_Semi_Exactly2FatJets",
+               "passCut6_Semi_Higgs",
+               "passCut7_Semi_Vfat",
+               "passCut8_Semi_OverlapRemoval",
+               "passCut9_Semi_4AK4",
+               "passCut10_Semi_VqqPair",
+               "passCut11_Semi_VBS",
+               "passCut12_Semi_xwqq",
+               "passCut13_Semi_xbb"
+           };
+           auto cutflow = Cutflow(df_final, cutflow_cuts_2FJ);
+           cutflow.Print(output_dir + "/" + output_file + "_cutflow_2FJ.txt");
+   }
     }
 
     if (!args.cut.empty()){
