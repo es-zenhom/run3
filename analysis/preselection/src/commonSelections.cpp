@@ -37,7 +37,8 @@ RNode AK8JetsPreselection(RNode df)
     // Select good AK8 jets
     auto df_out = df.Define("goodAK8Jets",
                           "CorrFatJet_pt > 300 && "
-                          "abs(FatJet_eta) <= 2.5 && "
+                          "abs(FatJet_eta) < 2.5 && "
+                          "CorrFatJet_mass > 50 && "
                           "FatJet_msoftdrop > 40 && "
                           "FatJet_jetId > 0")
                    .Define("FatJet_HbbScore", "FatJet_particleNetMD_Xbb / (FatJet_particleNetMD_Xbb + FatJet_particleNetMD_QCD)")
@@ -96,8 +97,8 @@ RNode AK4JetsPreselection(RNode df)
 RNode VBSJetsPreselection(RNode df)
 {
     std::cout << " -> Run commonSelections::VBSJetsPreselection()" << std::endl;
-    auto df_out = df.Define("goodVBSJets", "CorrJet_pt >= 20 && "
-                                           "abs(Jet_eta) <= 4.7 && "
+    auto df_out = df.Define("goodVBSJets", "CorrJet_pt >= 30 && "
+                                           "abs(Jet_eta) < 4.7 && "
                                            "((is2016 && Jet_jetId >= 1) || (!is2016 && Jet_jetId >= 2)) && "
                                            "(CorrJet_pt >= 50 || (CorrJet_pt < 50 && Jet_puId != 0))")
                       .Define("goodVBSJets_pt", "CorrJet_pt[goodVBSJets]")
